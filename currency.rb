@@ -3,7 +3,7 @@ require 'net/http'
 start = Time.now
 
 currencies =
-['USD', 'CAD', 'HKD', 'EUR', 'JPY']
+['USD', 'CAD', 'HKD', 'EUR', 'JPY', 'AUD', 'CNY', 'DEM', 'GBP', 'ILS', 'INR', 'XAU']
 
 threads = []
 
@@ -18,4 +18,4 @@ threads.each do |t|
   t.join
 end
 
-p "DONE------- #{Time.now - start} sec" #returns 0.393388 sec ~ 0.580347 sec
+p "DONE------- #{Time.now - start} sec" #returns 0.416909 sec ~ 0.424654 sec
