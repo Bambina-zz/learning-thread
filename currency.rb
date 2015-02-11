@@ -16,8 +16,8 @@ class CurrencyDownloader
       threads_count = 5
       threads = Array.new(threads_count)
 
-      #it is distributed following currencies by producer thread
-      work_queue = SizedQueue.new(threads_count)
+      #it is distributed following currencies by producer fiber
+      work_queue = Queue.new
 
       #a monitor can remind when a thread finishes then we can schedule a new one
       threads.extend(MonitorMixin)
@@ -31,11 +31,11 @@ class CurrencyDownloader
       #it's for the shared results array
       results_mutex = Mutex.new
 
-      consumer_thread = Thread.new do
+      consumer_fib = Fiber.new do
         loop do
-          break if sysexit && work_queue.length == 0
-          found_index = nil
+          Fiber.yield if work_queue.length == 0
 
+          found_index = nil
           threads.synchronize do #lock and access shared resource(threads[])
             threads_available.wait_while do
               #collects threads which are nil or having false status or finished
@@ -48,9 +48,8 @@ class CurrencyDownloader
               thread["finished"].nil? == false }
           end
           #キューから取り出してスレッドを作り実行する。
-          #一つ終わらせたら、signalをたたいてthreads[]配列に要素が追加されたことを通知する
+          #signalをたたいてthreads[]配列に要素が追加されたことを通知する。
           following_currency = work_queue.pop
-
           threads[found_index] = Thread.new(following_currency) do
             results_mutex.synchronize do
               results << Net::HTTP.get("download.finance.yahoo.com",
@@ -64,18 +63,18 @@ class CurrencyDownloader
         end
       end
 
-      producer_thread = Thread.new do
+      producer_fib = Fiber.new do
         currencies.each do |currency|
           work_queue << currency
-          threads.synchronize do
-            threads_available.signal
-          end
+          Fiber.yield if work_queue.length == 5
         end
         sysexit = true
       end
 
-      producer_thread.join
-      consumer_thread.join
+      until sysexit == true && work_queue.length == 0
+        producer_fib.resume
+        consumer_fib.resume
+      end
 
       threads.each do |thread|
           thread.join unless thread.nil?
@@ -94,6 +93,6 @@ loop do
     downloaded_currencies = Array.new
     downloaded_currencies << CurrencyDownloader.download_currencies
   end
-  sleep 300
+  sleep 10
 end
 
